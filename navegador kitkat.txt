@@ -1,0 +1,584 @@
+local GuiService = game:GetService("GuiService")
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local themes = {
+    redblue = {
+        primary = Color3.fromRGB(40, 15, 60),
+        secondary = Color3.fromRGB(60, 25, 80),
+        tertiary = Color3.fromRGB(30, 10, 50),
+        accent = Color3.fromRGB(120, 60, 160),
+        text = Color3.fromRGB(240, 230, 255),
+        textSecondary = Color3.fromRGB(180, 160, 220),
+        gradient = {
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(70, 30, 100)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(50, 20, 70)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 10, 50))
+        }
+    },
+    black = {
+        primary = Color3.fromRGB(12, 12, 12),
+        secondary = Color3.fromRGB(20, 20, 20),
+        tertiary = Color3.fromRGB(8, 8, 8),
+        accent = Color3.fromRGB(40, 40, 40),
+        text = Color3.fromRGB(240, 240, 240),
+        textSecondary = Color3.fromRGB(120, 120, 120),
+        gradient = {
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 20)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10, 10, 10)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 5, 5))
+        }
+    },
+    white = {
+        primary = Color3.fromRGB(245, 245, 245),
+        secondary = Color3.fromRGB(255, 255, 255),
+        tertiary = Color3.fromRGB(235, 235, 235),
+        accent = Color3.fromRGB(200, 200, 200),
+        text = Color3.fromRGB(20, 20, 20),
+        textSecondary = Color3.fromRGB(100, 100, 100),
+        gradient = {
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(245, 245, 245)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(235, 235, 235))
+        }
+    },
+    purple = {
+        primary = Color3.fromRGB(25, 15, 35),
+        secondary = Color3.fromRGB(35, 20, 45),
+        tertiary = Color3.fromRGB(15, 10, 25),
+        accent = Color3.fromRGB(60, 40, 80),
+        text = Color3.fromRGB(240, 230, 255),
+        textSecondary = Color3.fromRGB(150, 130, 170),
+        gradient = {
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 20, 50)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(25, 15, 35)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 10, 25))
+        }
+    }
+}
+
+local currentTheme = "redblue"
+local searchMode = "google"
+
+local function formatUrl(input, mode)
+    input = input:match("^%s*(.-)%s*$")
+    if input == "" then
+        return nil, "Please enter a URL or search query."
+    end
+    if input:match("^https?://") then
+        return input, nil
+    end
+    local searchQuery = input:gsub(" ", "+")
+    if mode == "youtube" then
+        return "https://www.youtube.com/results?search_query=" .. searchQuery, nil
+    else
+        return "https://www.google.com/search?q=" .. searchQuery, nil
+    end
+end
+
+local function open_browser(url, asJson)
+    local info = { presentationStyle = 2, url = tostring(url or ""), title = "Web Browser", visible = true }
+    local msg = asJson and HttpService:JSONEncode(info) or (info.title .. "\n" .. info.url)
+    GuiService:BroadcastNotification(msg, 20)
+end
+
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BrowserGui"
+screenGui.Parent = playerGui
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 380, 0, 180)
+frame.Position = UDim2.new(0.5, -190, 1, 200)
+frame.BackgroundColor3 = Color3.fromRGB(40, 15, 60)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local uiGradient = Instance.new("UIGradient")
+uiGradient.Color = ColorSequence.new(themes.redblue.gradient)
+uiGradient.Rotation = 135
+uiGradient.Parent = frame
+
+local uiCornerFrame = Instance.new("UICorner")
+uiCornerFrame.CornerRadius = UDim.new(0, 18)
+uiCornerFrame.Parent = frame
+
+local uiStrokeFrame = Instance.new("UIStroke")
+uiStrokeFrame.Thickness = 2
+uiStrokeFrame.Color = Color3.fromRGB(120, 60, 160)
+uiStrokeFrame.Transparency = 0.3
+uiStrokeFrame.Parent = frame
+
+local glowStroke = Instance.new("UIStroke")
+glowStroke.Thickness = 4
+glowStroke.Color = Color3.fromRGB(140, 80, 180)
+glowStroke.Transparency = 0.7
+glowStroke.Parent = frame
+
+local headerFrame = Instance.new("Frame")
+headerFrame.Size = UDim2.new(1, 0, 0, 60)
+headerFrame.Position = UDim2.new(0, 0, 0, 0)
+headerFrame.BackgroundColor3 = Color3.fromRGB(60, 25, 80)
+headerFrame.BackgroundTransparency = 0.3
+headerFrame.BorderSizePixel = 0
+headerFrame.Parent = frame
+
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 18)
+headerCorner.Parent = headerFrame
+
+local headerBottom = Instance.new("Frame")
+headerBottom.Size = UDim2.new(1, 0, 0, 18)
+headerBottom.Position = UDim2.new(0, 0, 1, -18)
+headerBottom.BackgroundColor3 = Color3.fromRGB(60, 25, 80)
+headerBottom.BackgroundTransparency = 0.3
+headerBottom.BorderSizePixel = 0
+headerBottom.Parent = headerFrame
+
+local logoImage = Instance.new("ImageLabel")
+logoImage.Size = UDim2.new(0, 40, 0, 40)
+logoImage.Position = UDim2.new(0, 15, 0.5, -20)
+logoImage.BackgroundTransparency = 1
+logoImage.Image = "rbxassetid://105882266197529"
+logoImage.ScaleType = Enum.ScaleType.Fit
+logoImage.Parent = headerFrame
+
+local logoGlow = Instance.new("UIStroke")
+logoGlow.Thickness = 2
+logoGlow.Color = Color3.fromRGB(160, 100, 200)
+logoGlow.Transparency = 0.5
+logoGlow.Parent = logoImage
+
+local logoCorner = Instance.new("UICorner")
+logoCorner.CornerRadius = UDim.new(0, 8)
+logoCorner.Parent = logoImage
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(0, 150, 0, 20)
+titleLabel.Position = UDim2.new(0, 65, 0.5, -25)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Web Browser"
+titleLabel.TextColor3 = Color3.fromRGB(240, 230, 255)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 16
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = headerFrame
+
+-- Subtítulo "Feito por stell" adicionado aqui
+local subtitleLabel = Instance.new("TextLabel")
+subtitleLabel.Size = UDim2.new(0, 150, 0, 15)
+subtitleLabel.Position = UDim2.new(0, 65, 0.5, -5)
+subtitleLabel.BackgroundTransparency = 1
+subtitleLabel.Text = "Feito por stell"
+subtitleLabel.TextColor3 = Color3.fromRGB(120, 100, 150)
+subtitleLabel.Font = Enum.Font.Gotham
+subtitleLabel.TextSize = 10
+subtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+subtitleLabel.Parent = headerFrame
+
+local menuButton = Instance.new("ImageButton")
+menuButton.Size = UDim2.new(0, 35, 0, 35)
+menuButton.Position = UDim2.new(1, -45, 0.5, -17.5)
+menuButton.BackgroundColor3 = Color3.fromRGB(70, 35, 90)
+menuButton.BackgroundTransparency = 0.4
+menuButton.Image = "rbxassetid://7734053495"
+menuButton.ImageColor3 = Color3.fromRGB(220, 200, 240)
+menuButton.Parent = headerFrame
+
+local menuCorner = Instance.new("UICorner")
+menuCorner.CornerRadius = UDim.new(0, 10)
+menuCorner.Parent = menuButton
+
+local menuStroke = Instance.new("UIStroke")
+menuStroke.Thickness = 1
+menuStroke.Color = Color3.fromRGB(140, 80, 180)
+menuStroke.Transparency = 0.3
+menuStroke.Parent = menuButton
+
+local settingsFrame = Instance.new("Frame")
+settingsFrame.Size = UDim2.new(0, 200, 0, 220)
+settingsFrame.Position = UDim2.new(1, -210, 0, 65)
+settingsFrame.BackgroundColor3 = Color3.fromRGB(40, 15, 60)
+settingsFrame.BorderSizePixel = 0
+settingsFrame.Visible = false
+settingsFrame.ZIndex = 100
+settingsFrame.Parent = frame
+
+local settingsCorner = Instance.new("UICorner")
+settingsCorner.CornerRadius = UDim.new(0, 12)
+settingsCorner.Parent = settingsFrame
+
+local settingsStroke = Instance.new("UIStroke")
+settingsStroke.Thickness = 2
+settingsStroke.Color = Color3.fromRGB(120, 60, 160)
+settingsStroke.Transparency = 0.3
+settingsStroke.Parent = settingsFrame
+
+local themeLabel = Instance.new("TextLabel")
+themeLabel.Size = UDim2.new(1, -20, 0, 25)
+themeLabel.Position = UDim2.new(0, 10, 0, 10)
+themeLabel.BackgroundTransparency = 1
+themeLabel.Text = "Theme"
+themeLabel.TextColor3 = Color3.fromRGB(240, 230, 255)
+themeLabel.Font = Enum.Font.GothamBold
+themeLabel.TextSize = 14
+themeLabel.TextXAlignment = Enum.TextXAlignment.Left
+themeLabel.ZIndex = 101
+themeLabel.Parent = settingsFrame
+
+local redblueBtn = Instance.new("TextButton")
+redblueBtn.Size = UDim2.new(1, -20, 0, 35)
+redblueBtn.Position = UDim2.new(0, 10, 0, 40)
+redblueBtn.BackgroundColor3 = Color3.fromRGB(60, 25, 80)
+redblueBtn.Text = "Red Blue"
+redblueBtn.TextColor3 = Color3.fromRGB(240, 230, 255)
+redblueBtn.Font = Enum.Font.GothamMedium
+redblueBtn.TextSize = 13
+redblueBtn.ZIndex = 101
+redblueBtn.Parent = settingsFrame
+
+local redblueCorner = Instance.new("UICorner")
+redblueCorner.CornerRadius = UDim.new(0, 8)
+redblueCorner.Parent = redblueBtn
+
+local redblueStroke = Instance.new("UIStroke")
+redblueStroke.Thickness = 1
+redblueStroke.Color = Color3.fromRGB(140, 80, 180)
+redblueStroke.Transparency = 0.3
+redblueStroke.Parent = redblueBtn
+
+local blackBtn = Instance.new("TextButton")
+blackBtn.Size = UDim2.new(1, -20, 0, 35)
+blackBtn.Position = UDim2.new(0, 10, 0, 80)
+blackBtn.BackgroundColor3 = Color3.fromRGB(60, 25, 80)
+blackBtn.Text = "Black"
+blackBtn.TextColor3 = Color3.fromRGB(240, 230, 255)
+blackBtn.Font = Enum.Font.GothamMedium
+blackBtn.TextSize = 13
+blackBtn.ZIndex = 101
+blackBtn.Parent = settingsFrame
+
+local blackCorner = Instance.new("UICorner")
+blackCorner.CornerRadius = UDim.new(0, 8)
+blackCorner.Parent = blackBtn
+
+local blackStroke = Instance.new("UIStroke")
+blackStroke.Thickness = 1
+blackStroke.Color = Color3.fromRGB(140, 80, 180)
+blackStroke.Transparency = 0.3
+blackStroke.Parent = blackBtn
+
+local whiteBtn = Instance.new("TextButton")
+whiteBtn.Size = UDim2.new(1, -20, 0, 35)
+whiteBtn.Position = UDim2.new(0, 10, 0, 120)
+whiteBtn.BackgroundColor3 = Color3.fromRGB(60, 25, 80)
+whiteBtn.Text = "White"
+whiteBtn.TextColor3 = Color3.fromRGB(240, 230, 255)
+whiteBtn.Font = Enum.Font.GothamMedium
+whiteBtn.TextSize = 13
+whiteBtn.ZIndex = 101
+whiteBtn.Parent = settingsFrame
+
+local whiteCorner = Instance.new("UICorner")
+whiteCorner.CornerRadius = UDim.new(0, 8)
+whiteCorner.Parent = whiteBtn
+
+local whiteStroke = Instance.new("UIStroke")
+whiteStroke.Thickness = 1
+whiteStroke.Color = Color3.fromRGB(140, 80, 180)
+whiteStroke.Transparency = 0.3
+whiteStroke.Parent = whiteBtn
+
+local purpleBtn = Instance.new("TextButton")
+purpleBtn.Size = UDim2.new(1, -20, 0, 35)
+purpleBtn.Position = UDim2.new(0, 10, 0, 160)
+purpleBtn.BackgroundColor3 = Color3.fromRGB(60, 25, 80)
+purpleBtn.Text = "Dark Purple"
+purpleBtn.TextColor3 = Color3.fromRGB(240, 230, 255)
+purpleBtn.Font = Enum.Font.GothamMedium
+purpleBtn.TextSize = 13
+purpleBtn.ZIndex = 101
+purpleBtn.Parent = settingsFrame
+
+local purpleCorner = Instance.new("UICorner")
+purpleCorner.CornerRadius = UDim.new(0, 8)
+purpleCorner.Parent = purpleBtn
+
+local purpleStroke = Instance.new("UIStroke")
+purpleStroke.Thickness = 1
+purpleStroke.Color = Color3.fromRGB(140, 80, 180)
+purpleStroke.Transparency = 0.3
+purpleStroke.Parent = purpleBtn
+
+local searchLabel = Instance.new("TextLabel")
+searchLabel.Size = UDim2.new(1, -20, 0, 25)
+searchLabel.Position = UDim2.new(0, 10, 0, 195)
+searchLabel.BackgroundTransparency = 1
+searchLabel.Text = "Search Engine"
+searchLabel.TextColor3 = Color3.fromRGB(240, 230, 255)
+searchLabel.Font = Enum.Font.GothamBold
+searchLabel.TextSize = 14
+searchLabel.TextXAlignment = Enum.TextXAlignment.Left
+searchLabel.ZIndex = 101
+searchLabel.Parent = settingsFrame
+
+local searchToggle = Instance.new("TextButton")
+searchToggle.Size = UDim2.new(1, -20, 0, 35)
+searchToggle.Position = UDim2.new(0, 10, 0, 220)
+searchToggle.BackgroundColor3 = Color3.fromRGB(60, 25, 80)
+searchToggle.Text = "Google"
+searchToggle.TextColor3 = Color3.fromRGB(240, 230, 255)
+searchToggle.Font = Enum.Font.GothamMedium
+searchToggle.TextSize = 13
+searchToggle.ZIndex = 101
+searchToggle.Parent = settingsFrame
+
+local searchCorner = Instance.new("UICorner")
+searchCorner.CornerRadius = UDim.new(0, 8)
+searchCorner.Parent = searchToggle
+
+local searchStroke = Instance.new("UIStroke")
+searchStroke.Thickness = 1
+searchStroke.Color = Color3.fromRGB(140, 80, 180)
+searchStroke.Transparency = 0.3
+searchStroke.Parent = searchToggle
+
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, -30, 0, 100)
+contentFrame.Position = UDim2.new(0, 15, 0, 70)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = frame
+
+local searchIcon = Instance.new("ImageLabel")
+searchIcon.Size = UDim2.new(0, 20, 0, 20)
+searchIcon.Position = UDim2.new(0, 12, 0.5, -35)
+searchIcon.BackgroundTransparency = 1
+searchIcon.Image = "rbxassetid://7072719338"
+searchIcon.ImageColor3 = Color3.fromRGB(180, 160, 220)
+searchIcon.Parent = contentFrame
+
+local textBox = Instance.new("TextBox")
+textBox.Size = UDim2.new(1, 0, 0, 45)
+textBox.Position = UDim2.new(0, 0, 0, 0)
+textBox.BackgroundColor3 = Color3.fromRGB(30, 10, 50)
+textBox.BackgroundTransparency = 0.2
+textBox.TextColor3 = Color3.fromRGB(250, 240, 255)
+textBox.PlaceholderText = "Search or enter URL..."
+textBox.PlaceholderColor3 = Color3.fromRGB(180, 160, 220)
+textBox.Font = Enum.Font.GothamMedium
+textBox.TextSize = 15
+textBox.TextXAlignment = Enum.TextXAlignment.Left
+textBox.Text = ""
+textBox.Parent = contentFrame
+
+local textBoxPadding = Instance.new("UIPadding")
+textBoxPadding.PaddingLeft = UDim.new(0, 42)
+textBoxPadding.PaddingRight = UDim.new(0, 60)
+textBoxPadding.Parent = textBox
+
+local textBoxCorner = Instance.new("UICorner")
+textBoxCorner.CornerRadius = UDim.new(0, 12)
+textBoxCorner.Parent = textBox
+
+local textBoxStroke = Instance.new("UIStroke")
+textBoxStroke.Thickness = 2
+textBoxStroke.Color = Color3.fromRGB(120, 60, 160)
+textBoxStroke.Transparency = 0.2
+textBoxStroke.Parent = textBox
+
+local sendButton = Instance.new("ImageButton")
+sendButton.Size = UDim2.new(0, 45, 0, 45)
+sendButton.Position = UDim2.new(1, -45, 0, 0)
+sendButton.BackgroundColor3 = Color3.fromRGB(60, 25, 80)
+sendButton.BackgroundTransparency = 0.3
+sendButton.Image = "rbxassetid://7733964370"
+sendButton.ImageColor3 = Color3.fromRGB(240, 230, 255)
+sendButton.Parent = contentFrame
+
+local sendCorner = Instance.new("UICorner")
+sendCorner.CornerRadius = UDim.new(0, 12)
+sendCorner.Parent = sendButton
+
+local sendStroke = Instance.new("UIStroke")
+sendStroke.Thickness = 2
+sendStroke.Color = Color3.fromRGB(140, 80, 180)
+sendStroke.Transparency = 0.2
+sendStroke.Parent = sendButton
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, 0, 0, 25)
+statusLabel.Position = UDim2.new(0, 0, 0, 55)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(180, 160, 220)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 12
+statusLabel.Text = ""
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = contentFrame
+
+local function applyTheme(theme)
+    local t = themes[theme]
+    frame.BackgroundColor3 = t.primary
+    uiGradient.Color = ColorSequence.new(t.gradient)
+    uiStrokeFrame.Color = t.accent
+    glowStroke.Color = t.accent
+    headerFrame.BackgroundColor3 = t.secondary
+    headerBottom.BackgroundColor3 = t.secondary
+    titleLabel.TextColor3 = t.text
+    subtitleLabel.TextColor3 = t.textSecondary
+    textBox.BackgroundColor3 = t.tertiary
+    textBox.TextColor3 = t.text
+    textBox.PlaceholderColor3 = t.textSecondary
+    textBoxStroke.Color = t.accent
+    searchIcon.ImageColor3 = t.textSecondary
+    sendButton.BackgroundColor3 = t.secondary
+    sendStroke.Color = t.accent
+    sendButton.ImageColor3 = t.text
+    statusLabel.TextColor3 = t.textSecondary
+    menuButton.BackgroundColor3 = t.secondary
+    menuStroke.Color = t.accent
+    menuButton.ImageColor3 = t.text
+    settingsFrame.BackgroundColor3 = t.primary
+    settingsStroke.Color = t.accent
+    themeLabel.TextColor3 = t.text
+    searchLabel.TextColor3 = t.text
+    
+    redblueBtn.BackgroundColor3 = t.secondary
+    redblueBtn.TextColor3 = t.text
+    redblueStroke.Color = t.accent
+    
+    blackBtn.BackgroundColor3 = t.secondary
+    blackBtn.TextColor3 = t.text
+    blackStroke.Color = t.accent
+    
+    whiteBtn.BackgroundColor3 = t.secondary
+    whiteBtn.TextColor3 = t.text
+    whiteStroke.Color = t.accent
+    
+    purpleBtn.BackgroundColor3 = t.secondary
+    purpleBtn.TextColor3 = t.text
+    purpleStroke.Color = t.accent
+    
+    searchToggle.BackgroundColor3 = t.secondary
+    searchToggle.TextColor3 = t.text
+    searchStroke.Color = t.accent
+end
+
+local function animateOpen()
+    local tweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    local goal = {Position = UDim2.new(0.5, -190, 0.5, -90)}
+    TweenService:Create(frame, tweenInfo, goal):Play()
+end
+
+animateOpen()
+
+local dragging = false
+local dragStart
+local startPos
+local menuClicked = false
+
+headerFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if not menuClicked then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+        menuClicked = false
+    end
+end)
+
+headerFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end
+end)
+
+headerFrame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+menuButton.MouseButton1Click:Connect(function()
+    menuClicked = true
+    settingsFrame.Visible = not settingsFrame.Visible
+    if settingsFrame.Visible then
+        settingsFrame.Size = UDim2.new(0, 200, 0, 0)
+        TweenService:Create(settingsFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 200, 0, 260)}):Play()
+    end
+end)
+
+redblueBtn.MouseButton1Click:Connect(function()
+    currentTheme = "redblue"
+    applyTheme("redblue")
+    settingsFrame.Visible = false
+end)
+
+blackBtn.MouseButton1Click:Connect(function()
+    currentTheme = "black"
+    applyTheme("black")
+    settingsFrame.Visible = false
+end)
+
+whiteBtn.MouseButton1Click:Connect(function()
+    currentTheme = "white"
+    applyTheme("white")
+    settingsFrame.Visible = false
+end)
+
+purpleBtn.MouseButton1Click:Connect(function()
+    currentTheme = "purple"
+    applyTheme("purple")
+    settingsFrame.Visible = false
+end)
+
+searchToggle.MouseButton1Click:Connect(function()
+    if searchMode == "google" then
+        searchMode = "youtube"
+        searchToggle.Text = "YouTube"
+    else
+        searchMode = "google"
+        searchToggle.Text = "Google"
+    end
+end)
+
+sendButton.MouseButton1Click:Connect(function()
+    local input = textBox.Text
+    local url, errorMsg = formatUrl(input, searchMode)
+    
+    if errorMsg then
+        statusLabel.Text = errorMsg
+        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        wait(3)
+        statusLabel.Text = ""
+        return
+    end
+    
+    statusLabel.Text = "Opening " .. input .. "..."
+    statusLabel.TextColor3 = Color3.fromRGB(100, 220, 100)
+    open_browser(url, true)
+    
+    TweenService:Create(sendButton, TweenInfo.new(0.3, Enum.EasingStyle.Elastic), {Rotation = 360}):Play()
+    wait(0.3)
+    sendButton.Rotation = 0
+    
+    wait(2.7)
+    statusLabel.Text = ""
+end)
+
+textBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        sendButton.MouseButton1Click:Fire()
+    end
+end)
+
+-- Aplicar o tema vermelho/azul por padrão
+applyTheme("redblue")
